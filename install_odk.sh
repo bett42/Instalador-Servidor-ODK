@@ -411,6 +411,7 @@ main() {
     echo ""
     echo -e "${GREEN}================================================================${NC}"
     echo -e "${GREEN}  Instalador de ODK Central para RPi${NC}"
+    echo -e "${GREEN}  Version 2.2 - Corregido para Debian/Raspberry Pi${NC}"
     echo -e "${GREEN}================================================================${NC}"
     echo ""
     
@@ -426,3 +427,24 @@ main() {
     configure_env_file
     allow_postgres_upgrade
     build_docker_images
+    start_odk_central
+    create_admin_credentials
+    verify_installation
+    
+    echo ""
+    echo -e "${GREEN}================================================================${NC}"
+    echo -e "${GREEN}  ¡INSTALACIÓN COMPLETADA!${NC}"
+    echo -e "${GREEN}================================================================${NC}"
+    echo ""
+    echo -e "Accede a ODK Central en: ${CYAN}http://localhost${NC}"
+    echo -e "Directorio de instalación: ${CYAN}$(pwd)${NC}"
+    echo ""
+    echo -e "${BLUE}Comandos útiles:${NC}"
+    echo "  docker compose ps      # Ver estado de contenedores"
+    echo "  docker compose logs -f # Ver logs en tiempo real"
+    echo "  docker compose down    # Detener contenedores"
+    echo "  docker compose up -d   # Iniciar contenedores"
+    echo ""
+}
+
+main "$@"
