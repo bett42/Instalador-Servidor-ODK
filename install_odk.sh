@@ -420,11 +420,9 @@ main() {
     disable_ufw
     clone_odk_central
     
-    # CAMBIO CRÍTICO: Cambiar al directorio central aquí para que persista
     cd "$ODK_DIR"
     
     update_submodules
     configure_env_file
     allow_postgres_upgrade
     build_docker_images
-   
