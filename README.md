@@ -4,7 +4,7 @@
 ![Estado](https://img.shields.io/badge/Estado-Estable-green)
 ![Licencia](https://img.shields.io/badge/Licencia-GPL--3.0-orange)
 
-Script de instalación automatizada de ODK Central diseñado para entornos Raspberry Pi y distribuciones Linux.
+Script de instalación automatizada de ODK Central diseñado para entornos Raspberry Pi y distribuciones Debian.
 
 ## ¿Qué hace?
 
@@ -21,7 +21,7 @@ Antes de ejecutar la instalación, asegúrese de cumplir con las siguientes espe
 - **Memoria RAM:** 2 GB mínimo (4 GB recomendados para un rendimiento óptimo).
 - **Almacenamiento:** 10 GB de espacio disponible en disco.
 - **Conectividad:** Conexión a Internet activa para la descarga de imágenes y dependencias.
-- **Sistema Operativo:** Compatible con Debian, Ubuntu, Arch, OpenSUSE, RedHat o Fedora.
+- **Sistema Operativo:** Compatible con Debian, Ubuntu, Mint y distribuciones derivadas de Debian.
 
 ## Instalación
 
