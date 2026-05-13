@@ -29,7 +29,7 @@ Siga los siguientes pasos para clonar el repositorio y ejecutar el script de ins
 
 ```bash
 # Clonar repositorio
-git clone https://github.com/TU_USUARIO/Instalador-Servidor-ODK.git
+git clone https://github.com/bett42/Instalador-Servidor-ODK.git
 cd Instalador-Servidor-ODK
 
 # Dar permisos de ejecución al script
