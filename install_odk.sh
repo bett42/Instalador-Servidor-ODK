@@ -22,6 +22,8 @@ MIN_DOCKER_VERSION="23.0.0"
 MIN_COMPOSE_VERSION="2.16.0"
 ADMIN_EMAIL="admin@email.com"
 ADMIN_PASSWORD="1234567890"
+STARTUP_WAIT_TIME=240
+MAX_RETRIES=5
 
 ################################################################################
 # Funciones de utilidad
@@ -190,7 +192,7 @@ start_docker_service() {
     fi
     
     echo ""
-    log_info "Ahora mismo se están iniciando los servicios de Docker, por favor esperar unos segundos :-) (10 segundos)"
+    log_info "Ahora mismo se están iniciando los servicios de Docker, por favor esperar unos segundos :-)"
     sleep 10
     log_success "Se completó la espera de Docker"
     echo ""
@@ -235,7 +237,6 @@ clone_odk_central() {
     
     umask 022
     git clone https://github.com/getodk/central
-    # NOTA: El cd se hace en main() para que persista a las siguientes funciones
     log_success "Repositorio de ODK Central se clonó correctamente"
 }
 
@@ -318,16 +319,22 @@ allow_postgres_upgrade() {
 }
 
 ################################################################################
-# 10. Construir imágenes Docker
+# 10. Obtener imágenes Docker (pull en lugar de build)
 ################################################################################
 
 build_docker_images() {
-    log_step "Paso 9: Se construyen las imágenes Docker"
-    log_info "Se ejecuta: docker compose build"
+    log_step "Paso 9: Se obtienen las imágenes Docker"
+    log_info "Intentando descargar imágenes pre-construidas (más rápido y menos recursos)..."
     
-    docker compose build
-    
-    log_success "Imágenes Docker se construyeron correctamente"
+    if docker compose pull 2>/dev/null; then
+        log_success "Imágenes pre-construidas descargadas correctamente"
+    else
+        log_warning "No se pudieron descargar imágenes pre-construidas"
+        log_info "Intentando construir imágenes localmente (esto puede tardar 30+ minutos)..."
+        log_warning "RECOMENDACIÓN: Agrega swap de 4GB si tienes menos de 4GB de RAM"
+        docker compose build
+        log_success "Imágenes construidas localmente"
+    fi
 }
 
 ################################################################################
@@ -341,60 +348,175 @@ start_odk_central() {
     docker compose up -d
     
     echo ""
-    log_info "Ahora mismo se están iniciando los servicios de Docker Compose, por favor esperar unos segundos :-) (10 segundos)"
+    log_info "Esperando 10 segundos iniciales para que los contenedores arranquen..."
     sleep 10
-    log_success "Se completó la espera de Docker Compose"
+    log_success "Se completó la espera inicial de Docker Compose"
     echo ""
     
     log_success "Contenedores de ODK Central se iniciaron correctamente"
 }
 
 ################################################################################
-# 12. Crear credenciales de administrador
+# 12. Esperar a que ODK Central esté completamente listo
 ################################################################################
 
-create_admin_credentials() {
-    log_step "Paso 11: Se crean las credenciales de administrador"
-    echo -e "${PURPLE}  Configuración de usuario administrador${NC}"
-    echo -e "${PURPLE}================================================================${NC}"
+wait_for_odk_ready() {
+    log_step "Paso 11: Se espera a que ODK Central esté completamente listo"
+    log_info "ODK Central necesita aproximadamente ${STARTUP_WAIT_TIME} segundos para iniciar todos sus servicios..."
+    log_info "Esto incluye: PostgreSQL, migraciones de base de datos, nginx, service, etc."
     echo ""
     
-    log_info "Se ejecutan los comandos para crear el usuario administrador..."
+    local elapsed=0
+    local interval=10
+    
+    while [ $elapsed -lt $STARTUP_WAIT_TIME ]; do
+        echo -ne "  Tiempo transcurrido: ${elapsed}/${STARTUP_WAIT_TIME} segundos\r"
+        sleep $interval
+        elapsed=$((elapsed + interval))
+    done
+    
+    echo ""
+    log_success "Se completó la espera de ${STARTUP_WAIT_TIME} segundos"
     echo ""
     
-    log_info "Se crea el usuario administrador..."
-    docker compose exec -T service odk-cmd --email admin@email.com user-create
-    log_success "Usuario administrador se creó correctamente"
-    echo ""
+    # Verificar que los contenedores estén running
+    log_info "Verificando estado de los contenedores..."
+    docker compose ps
     
-    log_info "Se promueve el usuario a administrador..."
-    docker compose exec -T service odk-cmd --email admin@email.com user-promote
-    log_success "Usuario se promovió a administrador correctamente"
     echo ""
-    
-    log_info "Se establece la contraseña del administrador..."
-    log_warning "Contraseña configurada: 1234567890"
-    echo "1234567890" | docker compose exec -T service odk-cmd --email admin@email.com user-set-password
-    log_success "Contraseña se estableció correctamente"
-    echo ""
-    
-    echo -e "${GREEN}================================================================${NC}"
-    echo -e "${GREEN}  CREDENCIALES DE ADMINISTRADOR${NC}"
-    echo -e "${GREEN}================================================================${NC}"
-    echo -e "${CYAN}  Email: admin@email.com${NC}"
-    echo -e "${CYAN}  Contraseña: 1234567890${NC}"
-    echo -e "${GREEN}================================================================${NC}"
-    echo ""
-    log_warning "IMPORTANTE: Cambia la contraseña después del primer inicio de sesión"
 }
 
 ################################################################################
-# 13. Verificar estado de la instalación
+# 13. Verificar si el servicio está realmente listo para aceptar comandos
+################################################################################
+
+wait_for_service_ready() {
+    log_info "Verificando que el servicio de ODK esté listo para aceptar comandos..."
+    
+    local max_attempts=30
+    local attempt=1
+    
+    while [ $attempt -le $max_attempts ]; do
+        # Verificar que el contenedor esté Up
+        if docker compose ps service 2>/dev/null | grep -q "Up"; then
+            # Intentar ejecutar un comando simple para verificar que responde
+            if docker compose exec -T service odk-cmd --help >/dev/null 2>&1; then
+                log_success "Servicio de ODK está listo y respondiendo"
+                return 0
+            fi
+        fi
+        
+        echo -ne "  Esperando servicio (intento ${attempt}/${max_attempts})...\r"
+        sleep 10
+        attempt=$((attempt + 1))
+    done
+    
+    echo ""
+    log_error "El servicio no respondió después de ${max_attempts} intentos"
+    return 1
+}
+
+################################################################################
+# 14. Verificar si el usuario administrador ya existe
+################################################################################
+
+check_admin_user_exists() {
+    if docker compose exec -T service odk-cmd --list-users 2>/dev/null | grep -q "${ADMIN_EMAIL}"; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+################################################################################
+# 15. Crear credenciales de administrador (CON REINTENTOS AUTOMÁTICOS)
+################################################################################
+
+create_admin_credentials() {
+    log_step "Paso 12: Se crean las credenciales de administrador"
+    echo ""
+    
+    # Esperar a que el servicio esté realmente listo
+    if ! wait_for_service_ready; then
+        log_error "No se pudo conectar al servicio de ODK"
+        log_info "Los contenedores están corriendo, puedes crear las credenciales manualmente después"
+        return 1
+    fi
+    echo ""
+    
+    local retry=1
+    local credentials_created=false
+    
+    while [ $retry -le $MAX_RETRIES ] && [ "$credentials_created" = false ]; do
+        log_info "Intento ${retry}/${MAX_RETRIES} para crear credenciales..."
+        echo ""
+        
+        # VERIFICACIÓN: ¿El usuario ya existe?
+        if check_admin_user_exists; then
+            log_success "El usuario ${ADMIN_EMAIL} YA EXISTE. Configuración completada."
+            credentials_created=true
+            break
+        fi
+        
+        # Crear usuario
+        log_info "Creando usuario administrador..."
+        if docker compose exec -T service odk-cmd --email ${ADMIN_EMAIL} user-create 2>/dev/null; then
+            log_success "Usuario administrador creado correctamente"
+        else
+            log_warning "No se pudo crear el usuario (intento ${retry}/${MAX_RETRIES})"
+            sleep 5
+            retry=$((retry + 1))
+            continue
+        fi
+        
+        # Promover a administrador
+        log_info "Promoviendo usuario a administrador..."
+        if docker compose exec -T service odk-cmd --email ${ADMIN_EMAIL} user-promote 2>/dev/null; then
+            log_success "Usuario promovido a administrador correctamente"
+        else
+            log_warning "No se pudo promover el usuario (intento ${retry}/${MAX_RETRIES})"
+            sleep 5
+            retry=$((retry + 1))
+            continue
+        fi
+        
+        # Establecer contraseña
+        log_info "Estableciendo contraseña del administrador..."
+        if echo "${ADMIN_PASSWORD}" | docker compose exec -T service odk-cmd --email ${ADMIN_EMAIL} user-set-password 2>/dev/null; then
+            log_success "Contraseña establecida correctamente"
+            credentials_created=true
+        else
+            log_warning "No se pudo establecer la contraseña (intento ${retry}/${MAX_RETRIES})"
+            sleep 5
+            retry=$((retry + 1))
+            continue
+        fi
+    done
+    
+    if [ "$credentials_created" = true ]; then
+        echo ""
+        echo -e "${GREEN}================================================================${NC}"
+        echo -e "${GREEN}  CREDENCIALES DE ADMINISTRADOR${NC}"
+        echo -e "${GREEN}================================================================${NC}"
+        echo -e "${CYAN}  Email: ${ADMIN_EMAIL}${NC}"
+        echo -e "${CYAN}  Contraseña: ${ADMIN_PASSWORD}${NC}"
+        echo -e "${GREEN}================================================================${NC}"
+        echo ""
+        log_success "Credenciales creadas exitosamente"
+        return 0
+    else
+        log_error "No se pudieron crear las credenciales después de ${MAX_RETRIES} intentos"
+        return 1
+    fi
+}
+
+################################################################################
+# 16. Verificar estado de la instalación
 ################################################################################
 
 verify_installation() {
-    log_step "Paso 12: Se verifica el estado de la instalación"
-    log_info "Se muestra el estado de los contenedores..."
+    log_step "Paso 13: Se verifica el estado de la instalación"
+    log_info "Se muestra el estado final de los contenedores..."
     echo ""
     
     docker compose ps
@@ -410,8 +532,7 @@ verify_installation() {
 main() {
     echo ""
     echo -e "${GREEN}================================================================${NC}"
-    echo -e "${GREEN}  Instalador de ODK Central para RPi${NC}"
-    echo -e "${GREEN}  Version 2.2 - Corregido para Debian/Raspberry Pi${NC}"
+    echo -e "${GREEN}  Instalador de ODK Central${NC}"
     echo -e "${GREEN}================================================================${NC}"
     echo ""
     
@@ -428,22 +549,23 @@ main() {
     allow_postgres_upgrade
     build_docker_images
     start_odk_central
+    wait_for_odk_ready
     create_admin_credentials
     verify_installation
     
     echo ""
     echo -e "${GREEN}================================================================${NC}"
-    echo -e "${GREEN}  ¡INSTALACIÓN COMPLETADA!${NC}"
+    echo -e "${GREEN}  INSTALACIÓN COMPLETADA!!!${NC}"
     echo -e "${GREEN}================================================================${NC}"
     echo ""
     echo -e "Accede a ODK Central en: ${CYAN}http://localhost${NC}"
     echo -e "Directorio de instalación: ${CYAN}$(pwd)${NC}"
     echo ""
     echo -e "${BLUE}Comandos útiles:${NC}"
-    echo "  docker compose ps      # Ver estado de contenedores"
-    echo "  docker compose logs -f # Ver logs en tiempo real"
-    echo "  docker compose down    # Detener contenedores"
-    echo "  docker compose up -d   # Iniciar contenedores"
+    echo " sudo docker compose ps      # Ver estado de contenedores"
+    echo " sudo docker compose logs -f # Ver logs en tiempo real"
+    echo " sudo docker compose down    # Detener contenedores"
+    echo " sudo docker compose up -d   # Iniciar contenedores"
     echo ""
 }
 
