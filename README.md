@@ -37,3 +37,6 @@ chmod +x install_odk.sh
 
 # Ejecutar instalador como superusuario
 sudo ./install_odk.sh
+```
+
+Al finalizar el Script son necesarias un par de interacciones mínimas del usuario, que están asistidas por una guía visual incluida en el script.
