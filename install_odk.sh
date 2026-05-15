@@ -14,7 +14,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Variables de configuración
-ODK_DIR="/opt/odk-central"
+ODK_DIR="$HOME/central"
 ENV_FILE="${ODK_DIR}/.env"
 MIN_DOCKER_VERSION="23.0.0"
 MIN_COMPOSE_VERSION="2.16.0"
@@ -329,7 +329,7 @@ start_odk_central() {
     log_info "Ejecutando docker compose up -d..."
     sudo docker compose up -d
     
-    log_info "Esperando 180 segundos para que los servicios de ODK Central inicien completamente..."
+    log_info "Esperando 180 segundos para que los servicios de ODK Central inicien completamente :-)..."
     log_info "Esto incluye: PostgreSQL, migraciones, nginx, service, etc."
     echo ""
     
@@ -358,6 +358,7 @@ create_admin_user() {
     cd "$ODK_CURRENT_DIR"
     
     log_info "Ejecutando comando para crear usuario..."
+    log_warning "Importante: La contraseña del usuario debe de ser 10 o mas caracteres"
     sudo docker compose exec service odk-cmd --email ${ADMIN_EMAIL} user-create
     
     log_success "Usuario creado correctamente"
@@ -371,12 +372,6 @@ verify_installation() {
     log_info "Verificando estado de los contenedores..."
     
     sudo docker compose ps
-    
-    log_info "Para verificar el estado completo, ejecuta:"
-    echo "  cd $ODK_DIR && sudo docker compose ps"
-    echo ""
-    log_info "Para ver los logs:"
-    echo "  cd $ODK_DIR && sudo docker compose logs -f"
 }
 
 ################################################################################
@@ -385,9 +380,9 @@ verify_installation() {
 
 main() {
     echo ""
-    echo "========================================"
-    echo "  Instalador de ODK Central para RPi"
-    echo "========================================"
+    echo "========================================="
+    echo "  Instalador de ODK Central para Linux"
+    echo "========================================="
     echo ""
     
     check_internet_connection
@@ -406,7 +401,6 @@ main() {
     setup_odk_directory
     configure_env_file
     
-    # Crear archivo allow-postgres14-upgrade
     allow_postgres_upgrade
     
     start_docker_service
@@ -418,10 +412,10 @@ main() {
     
     echo ""
     echo "========================================"
-    log_success "¡Instalación completada!"
+    log_success "Instalación completada!!!"
     echo "========================================"
     echo ""
-    echo "Accede a ODK Central en: http://localhost"
+    echo "Accede a ODK Central en: http://localhost en tu navegador"
     echo "Directorio de instalación: $ODK_DIR"
     echo ""
     echo "========================================"
@@ -432,23 +426,23 @@ main() {
     echo ""
     echo "1. Ejecuta el siguiente comando:"
     echo ""
-    echo "   docker compose exec service odk-cmd --email admin@email.com user-promote"
+    echo "  sudo docker compose exec service odk-cmd --email admin@email.com user-promote"
     echo ""
     echo "2. Selecciona el comando de la línea anterior con Ctrl + Shift + C"
     echo ""
     echo "3. Ahora ejecuta:"
-    echo "   cd central"
+    echo "   cd central (en caso de que estés por fuera del directorio $HOME/central/)"
     echo ""
     echo "4. Presiona Ctrl + Shift + V y dale Enter"
     echo ""
     echo "========================================"
     echo ""
     echo "Comandos útiles:"
-    echo "  cd $ODK_DIR && sudo docker compose ps      # Ver estado"
-    echo "  cd $ODK_DIR && sudo docker compose logs -f # Ver logs"
-    echo "  cd $ODK_DIR && sudo docker compose down    # Detener"
-    echo "  cd $ODK_DIR && sudo docker compose up -d   # Iniciar"
-    echo ""
+    echo " sudo cd $ODK_DIR && sudo docker compose ps      # Ver estado"
+    echo " sudo cd $ODK_DIR && sudo docker compose logs -f # Ver logs"
+    echo " sudo cd $ODK_DIR && sudo docker compose down    # Detener"
+    echo " sudo cd $ODK_DIR && sudo docker compose up -d   # Iniciar"
+    echo ""   
 }
 
 main "$@"
