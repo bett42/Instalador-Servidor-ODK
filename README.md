@@ -18,8 +18,8 @@ Este script despliega una instancia de ODK Central completamente configurada, in
 
 Antes de ejecutar la instalación, asegúrese de cumplir con las siguientes especificaciones:
 
-- **Memoria RAM:** 2 GB mínimo (4 GB recomendados para un rendimiento óptimo).
-- **Almacenamiento:** 10 GB de espacio disponible en disco.
+- **Memoria RAM:** 4 GB mínimo (8 GB recomendados para un rendimiento óptimo).
+- **Almacenamiento:** 20 GB de espacio disponible en disco.
 - **Conectividad:** Conexión a Internet activa para la descarga de imágenes y dependencias.
 - **Sistema Operativo:** Compatible con Debian, Ubuntu, Mint y distribuciones derivadas de Debian.
 
