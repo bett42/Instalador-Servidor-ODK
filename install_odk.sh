@@ -204,6 +204,10 @@ setup_odk_directory() {
         log_info "Directorio de ODK Central ya existe"
         cd "$ODK_DIR"
     fi
+    
+    # GUARDAR la ruta actual para usarla después
+    export ODK_CURRENT_DIR="$(pwd)"
+    log_info "Directorio actual: $ODK_CURRENT_DIR"
 }
 
 configure_env_file() {
@@ -260,20 +264,27 @@ configure_env_file() {
 }
 
 ################################################################################
-# 5. Manejo de error de postgres
+# 5. Arreglo del postgres
 ################################################################################
 
 allow_postgres_upgrade() {
     log_info "Creando archivo allow-postgres14-upgrade..."
     
-    if [ ! -d "./files" ]; then
-        mkdir -p ./files
+    # Usar la ruta guardada explícitamente
+    cd "$ODK_CURRENT_DIR"
+    
+    # Crear directorio files si no existe
+    if [ ! -d "${ODK_CURRENT_DIR}/files" ]; then
+        mkdir -p "${ODK_CURRENT_DIR}/files"
     fi
     
-    touch ./files/allow-postgres14-upgrade
+    # Crear el archivo con ruta absoluta
+    touch "${ODK_CURRENT_DIR}/files/allow-postgres14-upgrade"
     
-    if [ -f "./files/allow-postgres14-upgrade" ]; then
-        log_success "Archivo allow-postgres14-upgrade creado correctamente"
+    # Verificar que se creó correctamente
+    if [ -f "${ODK_CURRENT_DIR}/files/allow-postgres14-upgrade" ]; then
+        log_success "Archivo allow-postgres14-upgrade creado en: ${ODK_CURRENT_DIR}/files/"
+        ls -la "${ODK_CURRENT_DIR}/files/"
     else
         log_error "No se pudo crear el archivo allow-postgres14-upgrade"
         exit 1
@@ -300,7 +311,15 @@ start_docker_service() {
 start_odk_central() {
     log_info "Iniciando ODK Central..."
     
-    cd "$ODK_DIR"
+    # Asegurar que estamos en el directorio correcto
+    cd "$ODK_CURRENT_DIR"
+    log_info "Directorio actual: $(pwd)"
+    
+    # Verificar que el archivo existe antes de continuar
+    if [ ! -f "${ODK_CURRENT_DIR}/files/allow-postgres14-upgrade" ]; then
+        log_error "El archivo allow-postgres14-upgrade no existe. No se puede continuar."
+        exit 1
+    fi
     
     if ! docker compose version &> /dev/null; then
         log_error "docker compose no está disponible"
@@ -336,7 +355,7 @@ start_odk_central() {
 create_admin_user() {
     log_info "Creando usuario administrador..."
     
-    cd "$ODK_DIR"
+    cd "$ODK_CURRENT_DIR"
     
     log_info "Ejecutando comando para crear usuario..."
     sudo docker compose exec service odk-cmd --email ${ADMIN_EMAIL} user-create
@@ -387,7 +406,7 @@ main() {
     setup_odk_directory
     configure_env_file
     
-    # AGREGADO: Crear archivo allow-postgres14-upgrade (DEBE IR ANTES DE docker compose up)
+    # Crear archivo allow-postgres14-upgrade
     allow_postgres_upgrade
     
     start_docker_service
