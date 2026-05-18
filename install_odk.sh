@@ -13,8 +13,12 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# Detectar usuario real, para evitar que se almacene en /root/
+REAL_USER="${SUDO_USER:-${USER}}"
+REAL_HOME="/home/${REAL_USER}"
+
 # Variables de configuración
-ODK_DIR="$HOME/central"
+ODK_DIR="${REAL_HOME}/central"
 ENV_FILE="${ODK_DIR}/.env"
 MIN_DOCKER_VERSION="23.0.0"
 MIN_COMPOSE_VERSION="2.16.0"
@@ -123,9 +127,9 @@ install_docker() {
     sudo systemctl start docker
     sudo systemctl enable docker
     
-    if ! groups $USER | grep -q docker; then
+    if ! groups "${REAL_USER}" | grep -q docker; then
         log_info "Agregando usuario al grupo docker..."
-        sudo usermod -aG docker $USER
+        sudo usermod -aG docker "${REAL_USER}"
         log_warning "Debes cerrar sesión y volver a entrar para que los cambios de grupo surtan efecto"
     fi
     
@@ -186,11 +190,12 @@ check_docker_compose() {
 
 setup_odk_directory() {
     log_info "Configurando directorio de ODK Central..."
+    log_info "Ruta de instalación: ${ODK_DIR}"
     
     if [ ! -d "$ODK_DIR" ]; then
         log_info "Clonando repositorio de ODK Central..."
-        sudo mkdir -p "$ODK_DIR"
-        sudo chown $USER:$USER "$ODK_DIR"
+        mkdir -p "$ODK_DIR"
+        chown "${REAL_USER}:${REAL_USER}" "$ODK_DIR"
         cd "$ODK_DIR"
         
         git clone https://github.com/getodk/central.git . 2>/dev/null || {
@@ -204,6 +209,9 @@ setup_odk_directory() {
         log_info "Directorio de ODK Central ya existe"
         cd "$ODK_DIR"
     fi
+    
+    # Asegurar permisos correctos
+    chown -R "${REAL_USER}:${REAL_USER}" "$ODK_DIR"
     
     # GUARDAR la ruta actual para usarla después
     export ODK_CURRENT_DIR="$(pwd)"
@@ -278,7 +286,7 @@ allow_postgres_upgrade() {
         mkdir -p "${ODK_CURRENT_DIR}/files"
     fi
     
-    # Crear el archivo con ruta absoluta
+    # Crear el archivo con ruta fija, debido a errores al momento de comprobar elementos como docker, postgres, nginx, etc
     touch "${ODK_CURRENT_DIR}/files/allow-postgres14-upgrade"
     
     # Verificar que se creó correctamente
@@ -327,7 +335,7 @@ start_odk_central() {
     fi
     
     log_info "Ejecutando docker compose up -d..."
-    sudo docker compose up -d
+    docker compose up -d
     
     log_info "Esperando 180 segundos para que los servicios de ODK Central inicien completamente :-)..."
     log_info "Esto incluye: PostgreSQL, migraciones, nginx, service, etc."
@@ -359,7 +367,7 @@ create_admin_user() {
     
     log_info "Ejecutando comando para crear usuario..."
     log_warning "Importante: La contraseña del usuario debe de ser 10 o mas caracteres"
-    sudo docker compose exec service odk-cmd --email ${ADMIN_EMAIL} user-create
+    docker compose exec service odk-cmd --email ${ADMIN_EMAIL} user-create
     
     log_success "Usuario creado correctamente"
 }
@@ -371,7 +379,7 @@ create_admin_user() {
 verify_installation() {
     log_info "Verificando estado de los contenedores..."
     
-    sudo docker compose ps
+    docker compose ps
 }
 
 ################################################################################
@@ -383,6 +391,9 @@ main() {
     echo "========================================="
     echo "  Instalador de ODK Central para Linux"
     echo "========================================="
+    echo ""
+    log_info "Usuario: ${REAL_USER}"
+    log_info "Directorio de instalación: ${ODK_DIR}"
     echo ""
     
     check_internet_connection
@@ -415,7 +426,7 @@ main() {
     log_success "Instalación completada!!!"
     echo "========================================"
     echo ""
-    echo "Accede a ODK Central en: http://localhost en tu navegador"
+    echo "Accede a ODK Central en: http://localhost en tu navegador de preferencia"
     echo "Directorio de instalación: $ODK_DIR"
     echo ""
     echo "========================================"
@@ -426,12 +437,13 @@ main() {
     echo ""
     echo "1. Ejecuta el siguiente comando:"
     echo ""
-    echo "  sudo docker compose exec service odk-cmd --email admin@email.com user-promote"
+    echo "cd .. && cd central"
     echo ""
-    echo "2. Selecciona el comando de la línea anterior con Ctrl + Shift + C"
+    echo "2. Seleccionar, copia y pega el siguiente comando:"
     echo ""
-    echo "3. Ahora ejecuta:"
-    echo "   cd central (en caso de que estés por fuera del directorio $HOME/central/)"
+    echo "  docker compose exec service odk-cmd --email admin@email.com user-promote"
+    echo ""
+    echo "3. Selecciona el comando de la línea anterior con el cursor y copialo con Ctrl + Shift + C"
     echo ""
     echo "4. Presiona Ctrl + Shift + V y dale Enter"
     echo ""
