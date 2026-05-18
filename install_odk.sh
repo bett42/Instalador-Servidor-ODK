@@ -441,7 +441,7 @@ main() {
     echo ""
     echo "2. Seleccionar, copia y pega el siguiente comando:"
     echo ""
-    echo "  docker compose exec service odk-cmd --email admin@email.com user-promote"
+    echo " sudo docker compose exec service odk-cmd --email admin@email.com user-promote"
     echo ""
     echo "3. Selecciona el comando de la línea anterior con el cursor y copialo con Ctrl + Shift + C"
     echo ""
@@ -450,10 +450,10 @@ main() {
     echo "========================================"
     echo ""
     echo "Comandos útiles:"
-    echo " sudo cd $ODK_DIR && sudo docker compose ps      # Ver estado"
-    echo " sudo cd $ODK_DIR && sudo docker compose logs -f # Ver logs"
-    echo " sudo cd $ODK_DIR && sudo docker compose down    # Detener"
-    echo " sudo cd $ODK_DIR && sudo docker compose up -d   # Iniciar"
+    echo " cd $ODK_DIR && sudo docker compose ps      # Ver estado"
+    echo " cd $ODK_DIR && sudo docker compose logs -f # Ver logs"
+    echo " cd $ODK_DIR && sudo docker compose down    # Detener"
+    echo " cd $ODK_DIR && sudo docker compose up -d   # Iniciar"
     echo ""   
 }
 
