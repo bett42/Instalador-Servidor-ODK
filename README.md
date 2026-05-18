@@ -10,9 +10,11 @@ Script de instalación automatizada de ODK Central diseñado para entornos Raspb
 
 Este script despliega una instancia de ODK Central completamente configurada, incluyendo:
 
+- **Verificación de requisitos previos:** Comprueba que tienes conexión a Internet y otros requerimientos antes de empezar.
 - **Docker Engine y Docker Compose:** Instalación y configuración automática de los contenedores necesarios.
 - **Archivo .env preconfigurado:** Ajustes predeterminados para localhost y gestión de certificados SSL upstream.
 - **Usuario administrador:** Creación automática de la cuenta de administrador inicial para acceso inmediato.
+- **Confirmación de estado final:** Muestra el estado de los servicios inmediatamente después de la instalación.
 
 ## Requisitos
 
